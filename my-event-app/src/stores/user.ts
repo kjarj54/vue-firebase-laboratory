@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
-import { auth, db } from '../firebaseConfig';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { auth, googleProvider, db } from '../firebaseConfig';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, User, signInWithPopup } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import router from '../router';
 
@@ -48,6 +48,28 @@ export const useUserStore = defineStore('userStore', {
         return true;
       } catch (error) {
         alert("Credenciales no válidos");
+        return false;
+      } finally {
+        this.loadingUser = false;
+      }
+    },
+    async loginWithGoogle(): Promise<boolean> {
+      this.loadingUser = true;
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        const user = result.user;
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+
+        if (!userDoc.exists()) {
+          alert("El usuario no está registrado en la base de datos");
+          await signOut(auth); // Deslogea al usuario si no está en la base de datos
+          return false;
+        }
+
+        this.userData = { email: user.email, uid: user.uid, role: userDoc.data().role };
+        return true;
+      } catch (error) {
+        console.error("Error al iniciar sesión con Google:", error);
         return false;
       } finally {
         this.loadingUser = false;
@@ -108,7 +130,6 @@ export const useUserStore = defineStore('userStore', {
           role: role ?? null
         };
       }
-
     }
   },
 });
